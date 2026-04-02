@@ -1,0 +1,68 @@
+web:
+  enabled: true
+  max_results: 20
+  max_pages: 8
+  timeout_s: 15
+  rate_limit_rps: 2
+  api_key_env: ""
+
+dns:
+  enabled: true
+  timeout_s: 10
+  subdomains_enabled: true
+  crtsh_enabled: true
+  rate_limit_rps: 5
+
+github:
+  enabled: true
+  max_members: 50
+  max_repos: 30
+  secret_scan_enabled: true
+  api_key_env: GITHUB_TOKEN
+  rate_limit_rps: 1
+
+news:
+  enabled: true
+  gdelt_enabled: true
+  newsapi_enabled: true
+  rss_enabled: true
+  days_back: 90
+  max_articles: 50
+  api_key_env: NEWSAPI_KEY
+
+reddit:
+  enabled: false
+  max_posts: 100
+  comment_depth: 2
+  time_filter: year
+  api_key_env: REDDIT_CLIENT_ID
+
+email:
+  enabled: false
+  hunter_enabled: false
+  hibp_enabled: false
+  api_key_env: HUNTER_API_KEY
+
+geo:
+  enabled: false
+  osm_enabled: true
+  gsv_metadata_enabled: false
+  api_key_env: GOOGLE_MAPS_KEY
+
+legal:
+  enabled: true
+  court_listener_enabled: true
+  ofac_enabled: true
+  open_sanctions_enabled: true
+  sec_edgar_enabled: true
+  companies_house_enabled: true
+  api_key_env: COMPANIES_HOUSE_KEY
+
+shodan:
+  enabled: false
+  api_key_env: SHODAN_API_KEY
+
+wayback:
+  enabled: true
+  snapshots_per_domain: 12
+  check_deleted: true

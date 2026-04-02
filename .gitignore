@@ -1,0 +1,94 @@
+# ── Secrets & credentials ──────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ── Python ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+MANIFEST
+
+# ── Virtual environments ────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Testing & coverage ─────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Type checking ───────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+
+# ── Jupyter ─────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Data & outputs ─────────────────────────────────────────
+data/
+*.json
+!configs/*.json
+reports/
+output/
+exports/
+
+# ── Uploads & temp files ────────────────────────────────────
+uploads/
+tmp/
+*.tmp
+*.bak
+*.swp
+/tmp/
+
+# ── Databases & checkpoints ─────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+langgraph_checkpoints/
+checkpoints/
+
+# ── Logs ────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Streamlit ───────────────────────────────────────────────
+.streamlit/secrets.toml
+
+# ── Docker ──────────────────────────────────────────────────
+.dockerignore
+
+# ── OS / editor artifacts ───────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+
+# ── spaCy models (large binary files) ──────────────────────
+# Models installed via pip are in site-packages, not here.
+# If you ever download model files locally, ignore them:
+models/
+*.bin
+!requirements.txt
+
+# ── Ollama / ML model weights ───────────────────────────────
+*.gguf
+*.ggml
+*.safetensors
+*.pt
+*.pth
