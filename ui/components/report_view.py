@@ -3,56 +3,122 @@ import streamlit as st
 import re
 
 
-CONFIDENCE_COLOR = {
-    "high":   "#1D9E75",
-    "medium": "#BA7517",
-    "low":    "#D85A30",
-}
-
-def _conf_label(score: float) -> tuple[str, str]:
+def _conf_badge(score: float) -> tuple[str, str, str]:
+    """Returns (label, bg_color, text_color)."""
     if score >= 0.75:
-        return "high",   CONFIDENCE_COLOR["high"]
+        return "HIGH",   "#00ff88", "#0a0e17"
     elif score >= 0.50:
-        return "medium", CONFIDENCE_COLOR["medium"]
-    return "low", CONFIDENCE_COLOR["low"]
+        return "MEDIUM", "#ff9500", "#0a0e17"
+    return "LOW", "#ff3366", "#ffffff"
 
 
-def render_report(report: dict):
-    """Render the full OSINTReport in the Streamlit report panel."""
-    if not report:
-        st.info("No report available yet.")
-        return
-
-    # ── Header ─────────────────────────────────────────────
-    level, color = _conf_label(report.get("confidence_overall", 0))
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Entities found",    len(report.get("entities", [])))
-    col2.metric("Relationships",     len(report.get("relationships", [])))
-    col3.metric("Claims",            len(report.get("claims", [])))
-    col4.metric("Sources",           len(report.get("source_urls", [])))
-
+def _section_header(title: str):
     st.markdown(
-        f"**Overall confidence:** "
-        f"<span style='color:{color};font-weight:600'>{level.upper()} ({report.get('confidence_overall', 0):.0%})</span>",
+        f"<div style='font-family:monospace;font-size:13px;font-weight:700;"
+        f"color:#00d4ff;letter-spacing:3px;text-transform:uppercase;"
+        f"border-bottom:1px solid #1a2535;padding-bottom:6px;margin:18px 0 10px'>"
+        f"// {title}</div>",
         unsafe_allow_html=True,
     )
 
-    # ── Executive Summary ───────────────────────────────────
-    st.subheader("Executive summary")
+
+def render_report(report: dict):
+    if not report:
+        st.markdown(
+            "<div style='font-family:monospace;color:#ff3366;padding:20px'>"
+            "> NO REPORT DATA IN BUFFER</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    conf     = report.get("confidence_overall", 0)
+    label, bg, fg = _conf_badge(conf)
+
+    # ── Header metrics ────────────────────────────────────────
+    st.markdown(
+        f"<div style='display:flex;align-items:center;gap:12px;margin-bottom:12px'>"
+        f"<span style='font-family:monospace;font-size:11px;color:#7a8fa6;"
+        f"letter-spacing:2px'>CONFIDENCE:</span>"
+        f"<span style='background:{bg};color:{fg};font-family:monospace;"
+        f"font-size:11px;font-weight:700;padding:2px 10px;border-radius:3px;"
+        f"letter-spacing:2px'>{label} {conf:.0%}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3, c4 = st.columns(4)
+    for col, label_txt, val in [
+        (c1, "ENTITIES",  len(report.get("entities", []))),
+        (c2, "LINKS",     len(report.get("relationships", []))),
+        (c3, "CLAIMS",    len(report.get("claims", []))),
+        (c4, "SOURCES",   len(report.get("source_urls", []))),
+    ]:
+        col.markdown(
+            f"<div style='background:#0f1520;border:1px solid #1a2535;"
+            f"border-top:2px solid #00d4ff;border-radius:4px;padding:10px;"
+            f"text-align:center'>"
+            f"<div style='font-family:monospace;font-size:20px;font-weight:700;"
+            f"color:#00ff88'>{val}</div>"
+            f"<div style='font-family:monospace;font-size:10px;color:#7a8fa6;"
+            f"letter-spacing:2px;margin-top:2px'>{label_txt}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    # ── Executive Summary ─────────────────────────────────────
+    _section_header("Executive Summary")
     summary = report.get("summary", "No summary available.")
-    # Highlight [SOURCE: ...] citations
     highlighted = re.sub(
         r'\[SOURCE: (https?://[^\]]+)\]',
-        r'<a href="\1" target="_blank" style="font-size:11px;color:#185FA5">[src]</a>',
-        summary
+        r'<a href="\1" target="_blank" style="font-size:11px;color:#00d4ff;'
+        r'font-family:monospace">[SRC]</a>',
+        summary,
     )
-    st.markdown(highlighted, unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='background:#0f1520;border:1px solid #1a2535;"
+        f"border-left:3px solid #00ff88;padding:14px;border-radius:4px;"
+        f"font-size:14px;line-height:1.7;color:#c8d8e8'>{highlighted}</div>",
+        unsafe_allow_html=True,
+    )
 
-    # ── Entities ────────────────────────────────────────────
-    st.subheader("Discovered entities")
-    entities = report.get("entities", [])
+    # ── Image Intelligence ────────────────────────────────────
+    images = report.get("image_results", [])
+    if images:
+        _section_header("Image Intelligence")
+        img_cols = st.columns(len(images))
+        for col, img in zip(img_cols, images):
+            thumbnail = img.get("thumbnail") or img.get("original", "")
+            source    = img.get("source_url", "#")
+            title     = img.get("title", "")[:48]
+            if thumbnail:
+                col.markdown(
+                    f"<a href='{source}' target='_blank' style='text-decoration:none'>"
+                    f"<div style='background:#0f1520;border:1px solid #1a2535;"
+                    f"border-top:2px solid #00d4ff;border-radius:4px;overflow:hidden;"
+                    f"transition:border-color 0.2s'>"
+                    f"<img src='{thumbnail}' style='width:100%;height:120px;"
+                    f"object-fit:cover;display:block' />"
+                    f"<div style='padding:5px 6px;font-family:monospace;font-size:10px;"
+                    f"color:#7a8fa6;letter-spacing:1px;white-space:nowrap;"
+                    f"overflow:hidden;text-overflow:ellipsis'>{title}</div>"
+                    f"</div></a>",
+                    unsafe_allow_html=True,
+                )
+
+    # ── Entities ──────────────────────────────────────────────
+    _section_header("Identified Entities")
+    entities  = report.get("entities", [])
+    type_order = ["PERSON", "ORG", "DOMAIN", "IP", "EMAIL", "LOCATION", "EVENT"]
+    TYPE_ICONS = {
+        "PERSON": "◈", "ORG": "⬡", "DOMAIN": "◉", "IP": "▣",
+        "EMAIL": "◎", "LOCATION": "◆", "EVENT": "◇",
+    }
+    TYPE_ACCENT = {
+        "PERSON": "#00ff88", "ORG": "#00d4ff", "DOMAIN": "#7b2fff",
+        "IP": "#ff3366", "EMAIL": "#ff9500", "LOCATION": "#39ff14", "EVENT": "#ff2d78",
+    }
+
     if entities:
-        type_order = ["PERSON", "ORG", "DOMAIN", "IP", "EMAIL", "LOCATION", "EVENT"]
         by_type: dict[str, list] = {}
         for e in entities:
             by_type.setdefault(e["type"], []).append(e)
@@ -61,67 +127,107 @@ def render_report(report: dict):
             group = by_type.get(etype, [])
             if not group:
                 continue
-            with st.expander(f"{etype} ({len(group)})", expanded=etype in ("PERSON", "ORG")):
+            accent = TYPE_ACCENT.get(etype, "#7a8fa6")
+            icon   = TYPE_ICONS.get(etype, "◦")
+            with st.expander(
+                f"{icon} {etype}  [{len(group)}]",
+                expanded=etype in ("PERSON", "ORG"),
+            ):
                 for ent in sorted(group, key=lambda x: x["confidence"], reverse=True):
-                    lvl, col = _conf_label(ent["confidence"])
+                    conf_l, conf_bg, conf_fg = _conf_badge(ent["confidence"])
                     src_count = len(ent.get("sources", []))
                     cross_ref = ent.get("attributes", {}).get("cross_referenced", False)
-                    badge = "✓ cross-referenced" if cross_ref else ""
                     st.markdown(
-                        f"**{ent['name']}** "
-                        f"<span style='color:{col};font-size:12px'>{ent['confidence']:.0%}</span> "
-                        f"<span style='color:#888;font-size:11px'>{src_count} source{'s' if src_count != 1 else ''} {badge}</span>",
+                        f"<div style='display:flex;align-items:center;gap:8px;"
+                        f"padding:5px 0;border-bottom:1px solid #1a2535'>"
+                        f"<span style='color:{accent};font-family:monospace;font-size:13px'>{icon}</span>"
+                        f"<span style='color:#e0e8f0;font-family:monospace;font-size:13px'>{ent['name']}</span>"
+                        f"<span style='background:{conf_bg};color:{conf_fg};font-family:monospace;"
+                        f"font-size:10px;padding:1px 6px;border-radius:2px;margin-left:4px'>{ent['confidence']:.0%}</span>"
+                        f"<span style='color:#334455;font-family:monospace;font-size:10px;margin-left:auto'>"
+                        f"{src_count} src{'s' if src_count != 1 else ''}</span>"
+                        + (f"<span style='color:#ffdd00;font-family:monospace;font-size:10px'>⬡ VERIFIED</span>"
+                           if cross_ref else "")
+                        + "</div>",
                         unsafe_allow_html=True,
                     )
     else:
-        st.write("No entities extracted.")
+        st.markdown(
+            "<div style='font-family:monospace;color:#ff9500'>WARN: NO ENTITIES EXTRACTED</div>",
+            unsafe_allow_html=True,
+        )
 
-    # ── Claims ──────────────────────────────────────────────
-    st.subheader("Intelligence claims")
-    claims = report.get("claims", [])
-    flagged = [c for c in claims if c.get("flagged")]
+    # ── Intelligence claims ───────────────────────────────────
+    _section_header("Intelligence Claims")
+    claims   = report.get("claims", [])
+    flagged  = [c for c in claims if c.get("flagged")]
     supported = [c for c in claims if not c.get("flagged")]
 
     if flagged:
-        st.warning(f"{len(flagged)} claim(s) flagged by critic as potentially unsupported")
-        with st.expander("Flagged claims"):
+        st.markdown(
+            f"<div style='background:#1a0810;border:1px solid #ff3366;"
+            f"border-left:3px solid #ff3366;padding:8px 12px;border-radius:4px;"
+            f"font-family:monospace;font-size:12px;color:#ff3366;margin-bottom:8px'>"
+            f"⚠ {len(flagged)} CLAIM(S) FLAGGED — INSUFFICIENT EVIDENCE</div>",
+            unsafe_allow_html=True,
+        )
+        with st.expander("// FLAGGED CLAIMS"):
             for c in flagged:
                 _render_claim(c, flagged=True)
 
     for claim in sorted(supported, key=lambda x: x["confidence"], reverse=True):
         _render_claim(claim)
 
-    # ── Intelligence gaps ────────────────────────────────────
+    # ── Intelligence gaps ─────────────────────────────────────
     gaps = report.get("gaps", [])
     if gaps:
-        st.subheader("Intelligence gaps")
+        _section_header("Intelligence Gaps")
         for gap in gaps:
-            st.markdown(f"- {gap}")
+            st.markdown(
+                f"<div style='font-family:monospace;font-size:13px;color:#ff9500;"
+                f"padding:3px 0'>◦ {gap}</div>",
+                unsafe_allow_html=True,
+            )
 
-    # ── Sources ─────────────────────────────────────────────
-    with st.expander(f"All sources ({len(report.get('source_urls', []))})"):
-        for url in report.get("source_urls", []):
-            st.markdown(f"- [{url}]({url})", unsafe_allow_html=True)
+    # ── Sources ───────────────────────────────────────────────
+    source_urls = report.get("source_urls", [])
+    with st.expander(f"// SOURCE REGISTRY  [{len(source_urls)}]"):
+        for url in source_urls:
+            st.markdown(
+                f"<div style='font-family:monospace;font-size:11px;color:#7a8fa6;"
+                f"padding:2px 0'>▸ <a href='{url}' target='_blank' "
+                f"style='color:#00d4ff;text-decoration:none'>{url}</a></div>",
+                unsafe_allow_html=True,
+            )
 
 
 def _render_claim(claim: dict, flagged: bool = False):
-    lvl, col = _conf_label(claim["confidence"])
-    border = "#D85A30" if flagged else col
-    urls   = claim.get("source_urls", [])
+    conf = claim.get("confidence", 0)
+    _, conf_bg, conf_fg = _conf_badge(conf)
+    border = "#ff3366" if flagged else "#1a2535"
+    left_bar = "#ff3366" if flagged else "#00ff88"
+
+    urls = claim.get("source_urls", [])
     src_html = " ".join(
-        f'<a href="{u}" target="_blank" style="font-size:11px;color:#185FA5">[src]</a>'
+        f'<a href="{u}" target="_blank" style="font-family:monospace;'
+        f'font-size:10px;color:#00d4ff;text-decoration:none">[SRC]</a>'
         for u in urls[:3]
     )
     text = re.sub(
         r'\[SOURCE: (https?://[^\]]+)\]',
-        r'<a href="\1" target="_blank" style="font-size:11px;color:#185FA5">[src]</a>',
-        claim["text"]
+        r'<a href="\1" target="_blank" style="font-family:monospace;'
+        r'font-size:10px;color:#00d4ff;text-decoration:none">[SRC]</a>',
+        claim.get("text", ""),
     )
     st.markdown(
-        f"""<div style='border-left:3px solid {border};padding:6px 12px;margin:4px 0;'>
-        <span style='font-size:14px'>{text}</span> {src_html}
-        <span style='color:{col};font-size:11px;margin-left:6px'>{claim['confidence']:.0%}</span>
-        {"<span style='color:#D85A30;font-size:11px'> ⚠ flagged</span>" if flagged else ""}
-        </div>""",
+        f"<div style='background:#0f1520;border:1px solid {border};"
+        f"border-left:3px solid {left_bar};padding:8px 12px;"
+        f"margin:4px 0;border-radius:0 4px 4px 0'>"
+        f"<span style='font-size:13px;color:#c8d8e8;line-height:1.6'>{text}</span> {src_html}"
+        f"<span style='background:{conf_bg};color:{conf_fg};font-family:monospace;"
+        f"font-size:10px;padding:1px 6px;border-radius:2px;margin-left:8px'>{conf:.0%}</span>"
+        + (f"<span style='color:#ff3366;font-family:monospace;font-size:10px;"
+           f"margin-left:6px'>⚠ FLAGGED</span>" if flagged else "")
+        + "</div>",
         unsafe_allow_html=True,
     )

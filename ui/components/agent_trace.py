@@ -3,93 +3,110 @@ import streamlit as st
 from datetime import datetime
 
 
-AGENT_COLORS = {
-    "planner":          {"bg": "#EEEDFE", "text": "#3C3489", "label": "Planner"},
-    "web_collector":    {"bg": "#E1F5EE", "text": "#085041", "label": "Web collector"},
-    "dns_agent":        {"bg": "#E6F1FB", "text": "#0C447C", "label": "DNS agent"},
-    "github_agent":     {"bg": "#F1EFE8", "text": "#444441", "label": "GitHub agent"},
-    "news_agent":       {"bg": "#FAEEDA", "text": "#633806", "label": "News agent"},
-    "entity_extractor": {"bg": "#CECBF6", "text": "#26215C", "label": "Entity extractor"},
-    "crossreference":   {"bg": "#9FE1CB", "text": "#04342C", "label": "Cross-reference"},
-    "synthesis":        {"bg": "#F5C4B3", "text": "#4A1B0C", "label": "Synthesis"},
-    "critic":           {"bg": "#FAECE7", "text": "#4A1B0C", "label": "Critic"},
-    "image_intel":      {"bg": "#F4C0D1", "text": "#4B1528", "label": "Image intel"},
-    "finalise":         {"bg": "#C0DD97", "text": "#173404", "label": "Finalise"},
+AGENT_CFG = {
+    "planner":          {"color": "#7b2fff", "label": "PLANNER",         "icon": "◈"},
+    "web_collector":    {"color": "#00ff88", "label": "WEB-COLLECTOR",   "icon": "◉"},
+    "dns_agent":        {"color": "#00d4ff", "label": "DNS-AGENT",       "icon": "▣"},
+    "github_agent":     {"color": "#39ff14", "label": "GITHUB-AGENT",    "icon": "⬡"},
+    "news_agent":       {"color": "#ff9500", "label": "NEWS-AGENT",      "icon": "◎"},
+    "legal_agent":      {"color": "#ff2d78", "label": "LEGAL-AGENT",     "icon": "◆"},
+    "geo_agent":        {"color": "#00ffcc", "label": "GEO-AGENT",       "icon": "◇"},
+    "email_agent":      {"color": "#ffdd00", "label": "EMAIL-AGENT",     "icon": "◈"},
+    "entity_extractor": {"color": "#7b2fff", "label": "ENTITY-EXTRACT",  "icon": "◉"},
+    "crossreference":   {"color": "#00ff88", "label": "CROSS-REF",       "icon": "⬡"},
+    "synthesis":        {"color": "#00d4ff", "label": "SYNTHESIS",       "icon": "▣"},
+    "critic":           {"color": "#ff9500", "label": "CRITIC",          "icon": "◆"},
+    "image_intel":      {"color": "#ff2d78", "label": "IMAGE-INTEL",     "icon": "◎"},
+    "image_search":     {"color": "#ffdd00", "label": "IMAGE-SEARCH",    "icon": "◎"},
+    "finalise":         {"color": "#00ff88", "label": "FINALISE",        "icon": "⬡"},
 }
 
 ACTION_ICONS = {
-    "tasks_generated":   "🗂",
-    "collected":         "📥",
-    "extracted":         "🔍",
-    "cross_referenced":  "🔗",
-    "report_generated":  "📄",
-    "review_complete":   "✅",
-    "analysed":          "🖼",
-    "error":             "❌",
-    "no_tasks":          "⏭",
-    "no_findings":       "⚠️",
-    "no_entities":       "⚠️",
-    "no_draft":          "⚠️",
-    "no_image":          "⏭",
-    "parse_error":       "❌",
-    "Report finalised":  "🏁",
+    "tasks_generated":   "▸",
+    "collected":         "▸",
+    "extracted":         "▸",
+    "cross_referenced":  "▸",
+    "report_generated":  "▸",
+    "review_complete":   "▸",
+    "analysed":          "▸",
+    "error":             "✗",
+    "no_tasks":          "—",
+    "no_findings":       "—",
+    "no_entities":       "—",
+    "no_draft":          "—",
+    "no_image":          "—",
+    "parse_error":       "✗",
+    "Report finalised":  "✓",
 }
+
+_PIPELINE_STAGES = [
+    ("planner",          "PLAN"),
+    ("web_collector",    "COLLECT"),
+    ("entity_extractor", "EXTRACT"),
+    ("crossreference",   "XREF"),
+    ("synthesis",        "SYNTH"),
+    ("critic",           "REVIEW"),
+    ("finalise",         "DONE"),
+]
 
 
 def render_trace(agent_trace: list[dict], status: str = "running"):
-    """Render the live agent execution trace."""
     if not agent_trace:
-        st.info("Waiting for agents to start...")
-        _render_pipeline_overview(active_agent=None)
+        st.markdown(
+            "<div style='font-family:monospace;color:#7a8fa6;padding:12px'>"
+            "> WAITING FOR AGENT SIGNALS...</div>",
+            unsafe_allow_html=True,
+        )
+        _render_pipeline_bar(active_agent=None)
         return
 
-    _render_pipeline_overview(
+    _render_pipeline_bar(
         active_agent=agent_trace[-1].get("agent") if status == "running" else None,
         done=(status == "done"),
     )
 
-    st.markdown("---")
-    st.caption(f"{len(agent_trace)} step{'s' if len(agent_trace) != 1 else ''} completed")
+    st.markdown(
+        f"<div style='font-family:monospace;font-size:11px;color:#334455;"
+        f"letter-spacing:2px;margin:10px 0 6px'>"
+        f"── LOG ENTRIES: <span style='color:#7a8fa6'>{len(agent_trace)}</span> ──</div>",
+        unsafe_allow_html=True,
+    )
 
     for i, step in enumerate(reversed(agent_trace)):
         _render_step(step, index=len(agent_trace) - i)
 
 
-def _render_pipeline_overview(active_agent: str | None, done: bool = False):
-    """Shows the pipeline stages with active stage highlighted."""
-    stages = [
-        ("planner",          "Plan"),
-        ("web_collector",    "Collect"),
-        ("entity_extractor", "Extract"),
-        ("crossreference",   "Cross-ref"),
-        ("synthesis",        "Synthesise"),
-        ("critic",           "Critique"),
-        ("finalise",         "Done"),
-    ]
-
-    cols = st.columns(len(stages))
-    for col, (key, label) in zip(cols, stages):
-        cfg = AGENT_COLORS.get(key, {"bg": "#F1EFE8", "text": "#444441"})
-        is_active = (active_agent and key in (active_agent or ""))
-        is_done_stage = done
+def _render_pipeline_bar(active_agent: str | None, done: bool = False):
+    cols = st.columns(len(_PIPELINE_STAGES))
+    for col, (key, label) in zip(cols, _PIPELINE_STAGES):
+        cfg       = AGENT_CFG.get(key, {"color": "#334455"})
+        is_active = active_agent and key in (active_agent or "")
+        color     = cfg["color"]
 
         if is_active:
-            border = f"2px solid {cfg['text']}"
+            border  = f"1px solid {color}"
+            bg      = f"rgba({_hex_to_rgb(color)},0.15)"
+            text_c  = color
             opacity = "1"
-        elif is_done_stage:
-            border = f"1px solid {cfg['text']}"
-            opacity = "0.9"
+            prefix  = "⟳ "
+        elif done:
+            border  = f"1px solid {color}"
+            bg      = f"rgba({_hex_to_rgb(color)},0.08)"
+            text_c  = color
+            opacity = "0.8"
+            prefix  = "✓ "
         else:
-            border = "1px solid #D3D1C7"
-            opacity = "0.45"
+            border  = "1px solid #1a2535"
+            bg      = "#0f1520"
+            text_c  = "#334455"
+            opacity = "0.6"
+            prefix  = ""
 
         col.markdown(
-            f"<div style='"
-            f"background:{cfg['bg']};color:{cfg['text']};"
-            f"border:{border};border-radius:6px;"
-            f"padding:5px 4px;text-align:center;"
-            f"font-size:11px;font-weight:500;opacity:{opacity};"
-            f"'>{label}</div>",
+            f"<div style='background:{bg};color:{text_c};border:{border};"
+            f"border-radius:3px;padding:5px 2px;text-align:center;"
+            f"font-family:monospace;font-size:10px;font-weight:700;"
+            f"letter-spacing:1px;opacity:{opacity}'>{prefix}{label}</div>",
             unsafe_allow_html=True,
         )
 
@@ -98,9 +115,15 @@ def _render_step(step: dict, index: int):
     agent  = step.get("agent", "unknown")
     action = step.get("action", "")
     ts     = step.get("timestamp", "")
-    cfg    = AGENT_COLORS.get(agent, {"bg": "#F1EFE8", "text": "#444441", "label": agent})
-    icon   = ACTION_ICONS.get(action, "▸")
-    label  = cfg.get("label", agent)
+
+    # Match agent key (strip _agent suffix for lookup)
+    cfg_key = agent
+    if cfg_key not in AGENT_CFG:
+        cfg_key = agent.replace("_agent", "")
+    cfg   = AGENT_CFG.get(cfg_key, {"color": "#334455", "label": agent.upper(), "icon": "◦"})
+    color = cfg["color"]
+    icon  = ACTION_ICONS.get(action, "▸")
+    is_error = action in ("error", "parse_error") or bool(step.get("error"))
 
     time_str = ""
     if ts:
@@ -110,95 +133,106 @@ def _render_step(step: dict, index: int):
         except Exception:
             time_str = ts[:8]
 
-    # Step header
+    status_color = "#ff3366" if is_error else color
+
     st.markdown(
-        f"<div style='display:flex;align-items:center;gap:8px;margin:6px 0 2px'>"
-        f"<span style='font-size:11px;color:#888'>{index:02d}</span>"
-        f"<span style='background:{cfg['bg']};color:{cfg['text']};"
-        f"padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500'>{label}</span>"
-        f"<span style='font-size:13px'>{icon}</span>"
-        f"<span style='font-size:12px;color:#5F5E5A'>{action.replace('_', ' ')}</span>"
-        f"<span style='margin-left:auto;font-size:11px;color:#B4B2A9;font-family:monospace'>{time_str}</span>"
+        f"<div style='display:flex;align-items:center;gap:8px;"
+        f"padding:6px 0;border-bottom:1px solid #0f1520'>"
+        f"<span style='font-family:monospace;font-size:10px;color:#334455'>{index:03d}</span>"
+        f"<span style='color:{status_color};font-family:monospace;font-size:12px'>{cfg['icon']}</span>"
+        f"<span style='color:{status_color};font-family:monospace;font-size:11px;"
+        f"font-weight:700;letter-spacing:1px'>{cfg['label']}</span>"
+        f"<span style='color:{status_color};font-family:monospace;font-size:11px'>{icon}</span>"
+        f"<span style='font-family:monospace;font-size:11px;color:#7a8fa6'>"
+        f"{action.replace('_', '-').upper()}</span>"
+        f"<span style='margin-left:auto;font-family:monospace;font-size:10px;"
+        f"color:#334455'>{time_str}</span>"
         f"</div>",
         unsafe_allow_html=True,
     )
 
-    # Step metrics (show whatever numeric fields are present)
+    # Metrics row
     metric_keys = [
-        ("task_count",        "tasks"),
-        ("raw_count",         "raw"),
-        ("deduped_count",     "deduped"),
-        ("count",             "items"),
-        ("entity_count",      "entities"),
-        ("relationship_count","relations"),
-        ("claim_count",       "claims"),
-        ("gap_count",         "gaps"),
-        ("cross_ref_count",   "cross-ref'd"),
-        ("high_confidence",   "high conf"),
-        ("finding_count",     "findings"),
-        ("reverse_urls",      "reverse URLs"),
-        ("ocr_chars",         "OCR chars"),
-        ("gaps_found",        "gaps"),
-        ("unsupported",       "unsupported"),
+        ("task_count",         "TASKS"),
+        ("raw_count",          "RAW"),
+        ("deduped_count",      "DEDUPED"),
+        ("count",              "ITEMS"),
+        ("entity_count",       "ENTITIES"),
+        ("relationship_count", "LINKS"),
+        ("claim_count",        "CLAIMS"),
+        ("gap_count",          "GAPS"),
+        ("cross_ref_count",    "XREF"),
+        ("high_confidence",    "HIGH-CONF"),
+        ("finding_count",      "FINDINGS"),
+        ("gaps_found",         "GAPS"),
+        ("unsupported",        "UNSUPPORTED"),
     ]
 
-    metrics = [(label, step[key]) for key, label in metric_keys if key in step and step[key]]
+    metrics = [(lbl, step[key]) for key, lbl in metric_keys if step.get(key)]
     if metrics:
-        mcols = st.columns(min(len(metrics), 5))
+        mcols = st.columns(min(len(metrics), 6))
         for mcol, (mlabel, mval) in zip(mcols, metrics):
-            mcol.metric(mlabel, mval)
+            mcol.markdown(
+                f"<div style='text-align:center;padding:4px'>"
+                f"<div style='font-family:monospace;font-size:16px;"
+                f"font-weight:700;color:{color}'>{mval}</div>"
+                f"<div style='font-family:monospace;font-size:9px;"
+                f"color:#334455;letter-spacing:1px'>{mlabel}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
-    # Boolean flags
-    flags = []
+    # Pass/fail badge
     if step.get("passed") is True:
-        flags.append(("✓ Passed critic review", "#0F6E56"))
-    if step.get("passed") is False:
-        flags.append(("✗ Issues found", "#993C1D"))
-    if step.get("has_gps"):
-        flags.append(("GPS extracted", "#185FA5"))
-
-    if flags:
-        flag_html = " ".join(
-            f"<span style='font-size:11px;color:{c}'>{t}</span>"
-            for t, c in flags
+        st.markdown(
+            f"<span style='font-family:monospace;font-size:10px;color:#00ff88;"
+            f"letter-spacing:1px'>✓ CRITIC-PASS</span>",
+            unsafe_allow_html=True,
         )
-        st.markdown(flag_html, unsafe_allow_html=True)
+    elif step.get("passed") is False:
+        st.markdown(
+            f"<span style='font-family:monospace;font-size:10px;color:#ff9500;"
+            f"letter-spacing:1px'>⚠ ISSUES-DETECTED</span>",
+            unsafe_allow_html=True,
+        )
 
-    # Tasks breakdown (planner output)
-    if "tasks" in step and step["tasks"]:
-        with st.expander(f"Task breakdown ({len(step['tasks'])})", expanded=False):
+    # Task breakdown
+    if step.get("tasks"):
+        with st.expander(f"TASK BREAKDOWN [{len(step['tasks'])}]"):
             for t in step["tasks"]:
-                ttype = t.get("type", "?")
-                tcfg  = AGENT_COLORS.get(ttype.replace("_agent", ""), {"bg": "#F1EFE8", "text": "#444441"})
+                ttype = t.get("type", "?").upper()
+                tcfg  = AGENT_CFG.get(t.get("type", ""), {"color": "#334455"})
                 st.markdown(
-                    f"<span style='background:{tcfg['bg']};color:{tcfg['text']};"
-                    f"padding:1px 6px;border-radius:3px;font-size:11px'>{ttype}</span> "
-                    f"<code style='font-size:11px'>{t.get('query', '')}</code>",
+                    f"<span style='color:{tcfg['color']};font-family:monospace;"
+                    f"font-size:11px;font-weight:700'>[{ttype}]</span> "
+                    f"<code style='font-size:11px;color:#7a8fa6'>{t.get('query', '')}</code>",
                     unsafe_allow_html=True,
                 )
 
     # Critic feedback
     if step.get("feedback") and step["feedback"] not in ("None", ""):
         st.markdown(
-            f"<div style='background:#FAECE7;color:#4A1B0C;"
-            f"border-left:3px solid #D85A30;padding:6px 10px;"
-            f"font-size:12px;border-radius:0 4px 4px 0;margin-top:4px'>"
-            f"Critic feedback: {step['feedback']}</div>",
+            f"<div style='background:#140d00;border-left:2px solid #ff9500;"
+            f"padding:6px 10px;font-family:monospace;font-size:11px;"
+            f"color:#ff9500;margin-top:4px'>CRITIC: {step['feedback']}</div>",
             unsafe_allow_html=True,
         )
 
-    # Errors
+    # Error
     if step.get("error"):
         st.markdown(
-            f"<div style='background:#FCEBEB;color:#501313;"
-            f"border-left:3px solid #E24B4A;padding:6px 10px;"
-            f"font-size:12px;border-radius:0 4px 4px 0;margin-top:4px'>"
-            f"Error: {step['error']}</div>",
+            f"<div style='background:#14000a;border-left:2px solid #ff3366;"
+            f"padding:6px 10px;font-family:monospace;font-size:11px;"
+            f"color:#ff3366;margin-top:4px'>ERROR: {step['error']}</div>",
             unsafe_allow_html=True,
         )
 
-    st.markdown(
-        "<hr style='border:none;border-top:0.5px solid var(--color-border-tertiary,"
-        "#E8E6DE);margin:6px 0'>",
-        unsafe_allow_html=True,
-    )
+
+def _hex_to_rgb(hex_color: str) -> str:
+    """Convert '#rrggbb' to 'r,g,b' string for rgba()."""
+    h = hex_color.lstrip("#")
+    try:
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        return f"{r},{g},{b}"
+    except Exception:
+        return "100,100,100"

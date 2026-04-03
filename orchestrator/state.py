@@ -59,6 +59,7 @@ class OSINTReport(TypedDict):
     gaps: list[str]
     confidence_overall: float
     generated_at: str
+    image_results: list[dict]   # [{title, thumbnail, original, source_url}]
 
 
 # Annotated list fields use operator.add so LangGraph can merge parallel updates
@@ -90,6 +91,9 @@ class OSINTState(TypedDict):
     draft_report: Optional[OSINTReport]
     critic_feedback: Optional[str]
     refinement_count: int                     # max 3 before forced exit
+
+    # ── Image search results ───────────────────────────────
+    image_results: Optional[list[dict]]       # [{title, thumbnail, original, source_url}]
 
     # ── Final output ───────────────────────────────────────
     final_report: Optional[OSINTReport]

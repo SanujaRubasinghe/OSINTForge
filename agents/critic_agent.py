@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+import os
 
 from anthropic import Anthropic
 
@@ -32,7 +33,7 @@ class CriticAgent:
     CONFIDENCE_THRESHOLD = 0.65
 
     def __init__(self):
-        self.client = Anthropic()
+        self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     def run(self, state: OSINTState) -> dict:
         draft = state.get("draft_report")
@@ -54,14 +55,24 @@ class CriticAgent:
 
         try:
             response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=1024,
+                model="claude-sonnet-4-6",
+                max_tokens=2048,
                 system=CRITIC_PROMPT,
                 messages=[{"role": "user", "content": f"Review this report:\n\n{report_text}"}],
             )
-            raw = response.content[0].text
-            if raw.strip().startswith("```"):
-                raw = raw.strip().split("\n", 1)[1].rsplit("```", 1)[0]
+            raw = response.content[0].text.strip()
+
+            # Strip markdown fences if present
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+
+            # Extract the JSON object even if there is trailing text
+            brace = raw.find("{")
+            if brace != -1:
+                raw = raw[brace:]
+            last = raw.rfind("}")
+            if last != -1:
+                raw = raw[: last + 1]
 
             critique = json.loads(raw)
 

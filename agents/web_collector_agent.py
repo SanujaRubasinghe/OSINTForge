@@ -67,7 +67,7 @@ class WebCollectorAgent:
             tasks = [self._fetch_one(client, url) for url in urls]
             pages = await asyncio.gather(*tasks, return_exceptions=True)
         for p in pages:
-            if isinstance(p, FindingRecord):
+            if isinstance(p, dict):
                 results.append(p)
         return results
 

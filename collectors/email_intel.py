@@ -6,7 +6,6 @@ import re
 import httpx
 
 HUNTER_URL = "https://api.hunter.io/v2"
-HIBP_URL   = "https://haveibeenpwned.com/api/v3"
 EMAIL_RE   = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b')
 
 
@@ -40,42 +39,6 @@ async def hunter_verify(email: str) -> dict:
     except Exception:
         return {}
 
-
-async def hibp_check_email(email: str) -> list[dict]:
-    """Check a single email against Have I Been Pwned."""
-    key = os.getenv("HIBP_API_KEY", "")
-    if not key:
-        return []
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                f"{HIBP_URL}/breachedaccount/{email}",
-                headers={"hibp-api-key": key, "User-Agent": "OSINTForge"},
-            )
-        if resp.status_code == 404:
-            return []
-        return resp.json()
-    except Exception:
-        return []
-
-
-async def hibp_check_domain(domain: str) -> list[dict]:
-    """Check all breaches affecting a domain."""
-    key = os.getenv("HIBP_API_KEY", "")
-    if not key:
-        return []
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                f"{HIBP_URL}/breaches",
-                params={"domain": domain},
-                headers={"hibp-api-key": key, "User-Agent": "OSINTForge"},
-            )
-        if resp.status_code == 404:
-            return []
-        return resp.json()
-    except Exception:
-        return []
 
 
 def extract_emails_from_text(text: str) -> list[str]:

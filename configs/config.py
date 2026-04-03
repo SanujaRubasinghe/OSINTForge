@@ -12,3 +12,6 @@ class APIKeys(BaseSettings):
     model_config = _base_config
 
 api_keys = APIKeys()
+
+
+# export $(grep -v '^#' .env | xargs)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from api.schemas import ReportResponse, OSINTReportOut, AgentTraceStep, EntityOut, RelationshipOut, ClaimOut
+from api.schemas import ReportResponse, OSINTReportOut, AgentTraceStep, EntityOut, RelationshipOut, ClaimOut, ImageResultOut
 from api.routes.query import _tasks
 
 router = APIRouter(prefix="/report", tags=["report"])
@@ -41,6 +41,7 @@ async def get_report(task_id: str) -> ReportResponse:
             gaps               = final.get("gaps", []),
             confidence_overall = final.get("confidence_overall", 0.0),
             generated_at       = final.get("generated_at", ""),
+            image_results      = [ImageResultOut(**img) for img in final.get("image_results", [])],
         )
 
     return ReportResponse(

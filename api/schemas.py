@@ -44,6 +44,13 @@ class ClaimOut(BaseModel):
     flagged:     bool
 
 
+class ImageResultOut(BaseModel):
+    title:      str
+    thumbnail:  str
+    original:   str
+    source_url: str
+
+
 class OSINTReportOut(BaseModel):
     target:             str
     summary:            str
@@ -54,6 +61,7 @@ class OSINTReportOut(BaseModel):
     gaps:               list[str]
     confidence_overall: float
     generated_at:       str
+    image_results:      list[ImageResultOut] = Field(default_factory=list)
 
 
 class AgentTraceStep(BaseModel):

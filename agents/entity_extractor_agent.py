@@ -1,6 +1,7 @@
 from __future__ import annotations
 import uuid
 import json
+import os
 from datetime import datetime, timezone
 
 import spacy
@@ -29,8 +30,9 @@ class EntityExtractorAgent:
     BATCH_SIZE = 5     # findings per LLM call to stay within context window
 
     def __init__(self):
+        ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self.nlp = spacy.load("en_core_web_trf")
-        self.llm = ChatOllama(model="qwen2.5:3b", temperature=0, format="json")
+        self.llm = ChatOllama(model="qwen2.5:3b", base_url=ollama_url, temperature=0, format="json")
 
     def run(self, state: OSINTState) -> dict:
         findings = state.get("findings", [])
@@ -59,11 +61,17 @@ class EntityExtractorAgent:
                     entity_registry[key] = ent
                     all_entities.append(ent)
 
+        # Build name → id lookup so relations can be resolved to real UUIDs
+        name_to_id: dict[str, str] = {
+            ent["name"].lower().strip(): ent["id"]
+            for ent in entity_registry.values()
+        }
+
         # ── LLM relation extraction (batched) ─────────────
         for i in range(0, len(findings), self.BATCH_SIZE):
             batch = findings[i:i + self.BATCH_SIZE]
             combined_text = "\n\n---\n\n".join(f["raw_text"][:500] for f in batch)
-            rels = self._extract_relations(combined_text, batch)
+            rels = self._extract_relations(combined_text, batch, name_to_id)
             all_relationships.extend(rels)
 
         return {
@@ -115,26 +123,53 @@ class EntityExtractorAgent:
 
     def _extract_relations(self,
                             text: str,
-                            findings: list[FindingRecord]) -> list[RelationshipRecord]:
+                            findings: list[FindingRecord],
+                            name_to_id: dict[str, str]) -> list[RelationshipRecord]:
         try:
             messages = [
                 SystemMessage(content=RELATION_PROMPT + text[:2000]),
                 HumanMessage(content="Extract triples from the above text."),
             ]
             response = self.llm.invoke(messages)
-            triples  = json.loads(response.content)
-            if not isinstance(triples, list):
+            raw = json.loads(response.content)
+
+            # Model may wrap the array: {"triples": [...]} or {"relations": [...]}
+            if isinstance(raw, dict):
+                raw = next((v for v in raw.values() if isinstance(v, list)), [])
+            if not isinstance(raw, list):
                 return []
 
             source_urls = [f["source_url"] for f in findings]
-            return [{
-                "id":               str(uuid.uuid4()),
-                "source_entity_id": t.get("subject", ""),
-                "target_entity_id": t.get("object", ""),
-                "label":            t.get("relation", "MENTIONED_WITH"),
-                "evidence":         text[:200],
-                "sources":          source_urls,
-                "confidence":       float(t.get("confidence", 0.6)),
-            } for t in triples[:10] if t.get("subject") and t.get("object")]
+            relationships = []
+            for t in raw[:10]:
+                subj = (t.get("subject") or "").lower().strip()
+                obj  = (t.get("object")  or "").lower().strip()
+                if not subj or not obj:
+                    continue
+
+                # Resolve names to UUIDs — try exact match first, then partial
+                src_id = name_to_id.get(subj) or self._fuzzy_resolve(subj, name_to_id)
+                tgt_id = name_to_id.get(obj)  or self._fuzzy_resolve(obj,  name_to_id)
+                if not src_id or not tgt_id or src_id == tgt_id:
+                    continue
+
+                relationships.append({
+                    "id":               str(uuid.uuid4()),
+                    "source_entity_id": src_id,
+                    "target_entity_id": tgt_id,
+                    "label":            t.get("relation", "MENTIONED_WITH"),
+                    "evidence":         text[:200],
+                    "sources":          source_urls,
+                    "confidence":       float(t.get("confidence", 0.6)),
+                })
+            return relationships
         except Exception:
             return []
+
+    @staticmethod
+    def _fuzzy_resolve(name: str, name_to_id: dict[str, str]) -> str | None:
+        """Return entity ID if name is a substring of a known entity or vice-versa."""
+        for known, eid in name_to_id.items():
+            if name in known or known in name:
+                return eid
+        return None

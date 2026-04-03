@@ -15,11 +15,9 @@ EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b')
 
 class EmailAgent:
     HUNTER_URL = "https://api.hunter.io/v2"
-    HIBP_URL   = "https://haveibeenpwned.com/api/v3"
 
     def __init__(self):
         self.hunter_key = os.getenv("HUNTER_API_KEY", "")
-        self.hibp_key   = os.getenv("HIBP_API_KEY", "")
 
     def run(self, state: OSINTState) -> dict:
         tasks = [t for t in state["collection_tasks"]
@@ -72,7 +70,6 @@ class EmailAgent:
     async def _collect_all(self, domain: str) -> list[FindingRecord]:
         results = await asyncio.gather(
             self._hunter_search(domain),
-            self._hibp_domain(domain),
             return_exceptions=True,
         )
         findings = []
@@ -117,40 +114,3 @@ class EmailAgent:
         except Exception:
             return []
 
-    async def _hibp_domain(self, domain: str) -> list[FindingRecord]:
-        if not self.hibp_key:
-            return []
-        try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                resp = await client.get(
-                    f"{self.HIBP_URL}/breaches",
-                    params={"domain": domain},
-                    headers={"hibp-api-key": self.hibp_key, "User-Agent": "OSINTForge"},
-                )
-            if resp.status_code == 404:
-                return []
-            breaches = resp.json()
-            if not breaches:
-                return []
-
-            text = "\n".join(
-                f"Breach: {b['Name']} ({b['BreachDate']}) — "
-                f"DataClasses: {', '.join(b.get('DataClasses', []))}"
-                for b in breaches
-            )
-            return [{
-                "id":          str(uuid.uuid4()),
-                "source_type": "hibp",
-                "source_url":  f"https://haveibeenpwned.com/DomainSearch/{domain}",
-                "raw_text":    f"HIBP found {len(breaches)} breach(es) for {domain}:\n{text}",
-                "title":       f"[RISK] {len(breaches)} data breach(es) for {domain}",
-                "timestamp":   datetime.now(timezone.utc).isoformat(),
-                "metadata": {
-                    "breach_count": len(breaches),
-                    "breaches":     [{"name": b["Name"], "date": b["BreachDate"],
-                                      "classes": b.get("DataClasses", [])} for b in breaches],
-                    "risk":         "data_breach",
-                },
-            }]
-        except Exception:
-            return []

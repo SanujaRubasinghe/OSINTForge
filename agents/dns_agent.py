@@ -42,10 +42,10 @@ class DNSAgent:
         )
         findings = []
         for r in results:
-            if isinstance(r, FindingRecord):
+            if isinstance(r, dict):
                 findings.append(r)
             elif isinstance(r, list):
-                findings.extend([x for x in r if isinstance(x, FindingRecord)])
+                findings.extend([x for x in r if isinstance(x, dict)])
         return findings
 
     def _whois(self, domain: str) -> FindingRecord:
