@@ -83,6 +83,7 @@ class OSINTState(TypedDict):
     # ── Image intelligence (optional) ──────────────────────
     exif_data: Optional[dict]
     reverse_search_urls: Optional[list[str]]
+    serp_reverse_results: Optional[list[dict]]  # [{title, link, source, thumbnail, snippet}]
     visual_analysis: Optional[dict]
     ocr_text: Optional[str]
     detected_logos: Optional[list[dict]]

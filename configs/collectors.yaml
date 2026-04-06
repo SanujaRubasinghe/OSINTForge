@@ -74,3 +74,8 @@ linkedin:
   max_results: 10
   timeout_s: 15
   api_key_env: SERPAPI_API_KEY
+
+reverse_image_search:
+  enabled: true
+  max_results: 5
+  api_key_env: SERPAPI_API_KEY

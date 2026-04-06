@@ -13,6 +13,7 @@ import httpx
 from anthropic import Anthropic
 
 from orchestrator.state import OSINTState, FindingRecord
+from collectors.image_search import fetch_reverse_image_search
 
 
 VISION_PROMPT = """You are an OSINT visual intelligence analyst. 
@@ -52,6 +53,7 @@ class ImageIntelAgent:
         visual_analysis = self._visual_analysis(image_path)
         ocr_text        = self._ocr_extract(image_path)
         reverse_urls    = asyncio.run(self._reverse_search(image_path))
+        serp_results    = asyncio.run(fetch_reverse_image_search(image_path))
 
         # Build a finding record for the image intel
         summary_parts = []
@@ -83,23 +85,26 @@ class ImageIntelAgent:
                 "visual_analysis": visual_analysis,
                 "ocr_text":        ocr_text,
                 "reverse_urls":    reverse_urls,
+                "serp_reverse":    serp_results,
             },
         }
 
         return {
-            "exif_data":          exif_data,
-            "visual_analysis":    visual_analysis,
-            "ocr_text":           ocr_text,
-            "reverse_search_urls": reverse_urls,
-            "findings":           [finding],
+            "exif_data":            exif_data,
+            "visual_analysis":      visual_analysis,
+            "ocr_text":             ocr_text,
+            "reverse_search_urls":  reverse_urls,
+            "serp_reverse_results": serp_results,
+            "findings":             [finding],
             "agent_trace": [{
-                "agent":      "image_intel",
-                "action":     "analysed",
-                "has_gps":    bool(exif_data and exif_data.get("gps_coords")),
-                "org_clues":  len(visual_analysis.get("organization_clues", [])) if visual_analysis else 0,
+                "agent":        "image_intel",
+                "action":       "analysed",
+                "has_gps":      bool(exif_data and exif_data.get("gps_coords")),
+                "org_clues":    len(visual_analysis.get("organization_clues", [])) if visual_analysis else 0,
                 "reverse_urls": len(reverse_urls),
-                "ocr_chars":  len(ocr_text or ""),
-                "timestamp":  datetime.now(timezone.utc).isoformat(),
+                "serp_reverse": len(serp_results),
+                "ocr_chars":    len(ocr_text or ""),
+                "timestamp":    datetime.now(timezone.utc).isoformat(),
             }],
         }
 
